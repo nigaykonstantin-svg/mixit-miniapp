@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MIXIT Creators</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2678b6;
+            --tg-theme-button-color: #FF6B9D;
+            --tg-theme-button-text-color: #ffffff;
+        }
+        
+        body {
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding-bottom: 100px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #FF6B9D 0%, #FF8A80 100%);
+            color: white;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .badge-hit { background: linear-gradient(135deg, #FF6B9D, #FF8A80); }
+        .badge-new { background: linear-gradient(135deg, #4CAF50, #66BB6A); }
+        
+        .level-bronze { background: #CD7F32; }
+        .level-silver { background: #C0C0C0; }
+        .level-gold { background: #FFD700; }
+        .level-platinum { background: #E5E4E2; }
+        .level-diamond { background: linear-gradient(135deg, #B9F2FF, #89CFF0); }
+        
+        .product-card.selected {
+            ring: 2px solid #FF6B9D;
+            box-shadow: 0 4px 20px rgba(255, 107, 157, 0.3);
+        }
+        
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #eee;
+            padding: 12px 16px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+        
+        .tab-active {
+            color: #FF6B9D;
+            border-bottom: 2px solid #FF6B9D;
+        }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        // Telegram WebApp API
+        const tg = window.Telegram?.WebApp;
+        
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.enableClosingConfirmation();
+        }
+        
+        // Данные пользователя из Telegram
+        const telegramUser = tg?.initDataUnsafe?.user || {
+            id: 123456789,
+            first_name: 'Тест',
+            last_name: 'Пользователь',
+            username: 'test_user'
+        };
+
+        // ==================== DATA ====================
+        
+        const PRODUCTS = [
+            { id: 1, name: 'Skin Chemistry Serum', category: 'Лицо', volume: '30 ml', desc: 'Сыворотка с гиалуроновой кислотой', rating: 4.9, badge: 'HIT', image: '🧴', color: '#FFB5C5' },
+            { id: 2, name: 'Coco Sulfate Free', category: 'Волосы', volume: '250 ml', desc: 'Бессульфатный шампунь с кокосовым маслом', rating: 4.8, badge: 'NEW', image: '🧴', color: '#87CEEB' },
+            { id: 3, name: 'Coffee Body Scrub', category: 'Тело', volume: '200 g', desc: 'Кофейный скраб для тела', rating: 5.0, badge: null, image: '☕', color: '#DEB887' },
+            { id: 4, name: 'Matte Lipstick Rose', category: 'Макияж', volume: '4 g', desc: 'Матовая помада розового оттенка', rating: 4.7, badge: 'HIT', image: '💄', color: '#FF6B9D' },
+            { id: 5, name: 'Hydra Face Cream', category: 'Лицо', volume: '50 ml', desc: 'Увлажняющий крем для лица', rating: 4.6, badge: null, image: '✨', color: '#E6E6FA' },
+            { id: 6, name: 'Keratin Hair Mask', category: 'Волосы', volume: '300 ml', desc: 'Восстанавливающая маска с кератином', rating: 4.9, badge: 'NEW', image: '💆', color: '#98FB98' },
+            { id: 7, name: 'Shea Body Butter', category: 'Тело', volume: '150 ml', desc: 'Питательное масло ши для тела', rating: 4.8, badge: null, image: '🧈', color: '#FFEFD5' },
+            { id: 8, name: 'Eyeshadow Palette', category: 'Макияж', volume: '12 colors', desc: 'Палетка теней натуральных оттенков', rating: 4.9, badge: 'HIT', image: '🎨', color: '#D2691E' },
+        ];
+        
+        const LEVELS = [
+            { name: 'Начинающий', min: 1000, max: 10000, minER: 3, color: '#CD7F32', products: [2, 4], emoji: '🥉' },
+            { name: 'Подающий надежды', min: 10000, max: 50000, minER: 4, color: '#C0C0C0', products: [3, 5], emoji: '🥈' },
+            { name: 'Опытный', min: 50000, max: 150000, minER: 3.5, color: '#FFD700', products: [4, 6], emoji: '🥇' },
+            { name: 'Продвинутый', min: 150000, max: 500000, minER: 3, color: '#E5E4E2', products: [6, 8], emoji: '💎' },
+            { name: 'Звезда', min: 500000, max: 999999999, minER: 2.5, color: '#B9F2FF', products: [8, 12], emoji: '⭐' },
+        ];
+
+        // ==================== STATE ====================
+        
+        let state = {
+            currentTab: 'catalog',
+            selectedProducts: [],
+            category: 'Все',
+            user: {
+                id: telegramUser.id,
+                name: telegramUser.first_name + ' ' + (telegramUser.last_name || ''),
+                username: '@' + (telegramUser.username || 'user'),
+                registered: false,
+                status: 'new', // new | pending | approved
+                levelIndex: 0,
+                points: 0,
+                followers: 0,
+                er: 0,
+            },
+            delivery: {
+                name: '',
+                phone: '',
+                address: '',
+            },
+            step: 'catalog', // catalog | cart | delivery | success
+            collabs: [],
+        };
+        
+        // Загружаем сохранённое состояние
+        const saved = localStorage.getItem('mixit_state');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                state = { ...state, ...parsed, selectedProducts: parsed.selectedProducts || [] };
+            } catch (e) {}
+        }
+        
+        function saveState() {
+            localStorage.setItem('mixit_state', JSON.stringify(state));
+        }
+
+        // ==================== RENDER ====================
+        
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (!state.user.registered) {
+                app.innerHTML = renderRegistration();
+            } else if (state.user.status === 'pending') {
+                app.innerHTML = renderPending();
+            } else if (state.user.status === 'approved') {
+                app.innerHTML = renderMain();
+            } else {
+                app.innerHTML = renderRegistration();
+            }
+            
+            saveState();
+        }
+        
+        // ==================== REGISTRATION ====================
+        
+        function renderRegistration() {
+            return `
+                <div class="min-h-screen flex flex-col p-4">
+                    <div class="text-center mb-8 mt-8">
+                        <div class="w-20 h-20 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-lg">
+                            ✨
+                        </div>
+                        <h1 class="text-2xl font-bold mb-2">MIXIT Creators</h1>
+                        <p class="text-gray-500">Станьте частью команды</p>
+                    </div>
+                    
+                    <div class="card p-4 mb-4 slide-up">
+                        <h2 class="font-semibold mb-4">Ваш профиль</h2>
+                        
+                        <div class="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
+                            <div class="w-12 h-12 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-2xl">
+                                👤
+                            </div>
+                            <div>
+                                <p class="font-medium">${state.user.name}</p>
+                                <p class="text-sm text-gray-500">${state.user.username}</p>
+                            </div>
+                            <span class="ml-auto text-green-500 text-sm">✓ Telegram</span>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-sm text-gray-500 mb-1 block">Instagram *</label>
+                                <input 
+                                    type="text" 
+                                    id="instagram"
+                                    placeholder="@ваш_аккаунт"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                >
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-sm text-gray-500 mb-1 block">Подписчики</label>
+                                    <input 
+                                        type="number" 
+                                        id="followers"
+                                        placeholder="15000"
+                                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="text-sm text-gray-500 mb-1 block">ER %</label>
+                                    <input 
+                                        type="number" 
+                                        id="er"
+                                        placeholder="4.5"
+                                        step="0.1"
+                                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                    >
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="text-sm text-gray-500 mb-1 block">Ниша</label>
+                                <select 
+                                    id="niche"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+                                >
+                                    <option value="">Выберите нишу</option>
+                                    <option value="beauty">Beauty</option>
+                                    <option value="skincare">Skincare</option>
+                                    <option value="lifestyle">Lifestyle</option>
+                                    <option value="fashion">Fashion</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-4 mb-4 slide-up" style="animation-delay: 0.1s">
+                        <h3 class="font-semibold mb-3">Что вы получите:</h3>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center gap-2">
+                                <span class="text-pink-500">✓</span>
+                                Бесплатные продукты для обзоров
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="text-pink-500">✓</span>
+                                Рост уровня и привилегий
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <span class="text-pink-500">✓</span>
+                                Возможность заработка для топов
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <button 
+                        onclick="submitRegistration()"
+                        class="w-full btn-primary py-4 rounded-xl font-semibold text-lg shadow-lg"
+                    >
+                        Отправить заявку
+                    </button>
+                </div>
+            `;
+        }
+        
+        function submitRegistration() {
+            const instagram = document.getElementById('instagram').value;
+            const followers = parseInt(document.getElementById('followers').value) || 0;
+            const er = parseFloat(document.getElementById('er').value) || 0;
+            const niche = document.getElementById('niche').value;
+            
+            if (!instagram || !followers || !er || !niche) {
+                tg?.showAlert('Заполните все поля');
+                return;
+            }
+            
+            // Определяем уровень
+            let levelIndex = 0;
+            for (let i = LEVELS.length - 1; i >= 0; i--) {
+                if (followers >= LEVELS[i].min && er >= LEVELS[i].minER) {
+                    levelIndex = i;
+                    break;
+                }
+            }
+            
+            state.user = {
+                ...state.user,
+                instagram,
+                followers,
+                er,
+                niche,
+                levelIndex,
+                registered: true,
+                status: 'pending',
+            };
+            
+            // Отправляем данные в бот
+            if (tg) {
+                tg.sendData(JSON.stringify({
+                    action: 'register',
+                    user: state.user
+                }));
+            }
+            
+            render();
+        }
+        
+        // ==================== PENDING ====================
+        
+        function renderPending() {
+            return `
+                <div class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+                    <div class="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center text-5xl mb-6 animate-pulse">
+                        ⏳
+                    </div>
+                    <h1 class="text-2xl font-bold mb-2">Заявка на модерации</h1>
+                    <p class="text-gray-500 mb-6">Мы проверяем ваш аккаунт. Обычно это занимает до 24 часов.</p>
+                    
+                    <div class="card p-4 w-full max-w-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-500">Подписчики</span>
+                            <span class="font-semibold">${formatNumber(state.user.followers)}</span>
+                        </div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-500">ER</span>
+                            <span class="font-semibold text-green-500">${state.user.er}%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">Уровень</span>
+                            <span class="font-semibold">${LEVELS[state.user.levelIndex].emoji} ${LEVELS[state.user.levelIndex].name}</span>
+                        </div>
+                    </div>
+                    
+                    <button 
+                        onclick="simulateApproval()"
+                        class="mt-6 text-pink-500 underline text-sm"
+                    >
+                        (Демо: симулировать одобрение)
+                    </button>
+                </div>
+            `;
+        }
+        
+        function simulateApproval() {
+            state.user.status = 'approved';
+            state.user.points = 0;
+            render();
+            tg?.showAlert('Ваша заявка одобрена! 🎉');
+        }
+        
+        // ==================== MAIN APP ====================
+        
+        function renderMain() {
+            let content = '';
+            
+            switch (state.step) {
+                case 'catalog':
+                    content = renderCatalog();
+                    break;
+                case 'cart':
+                    content = renderCart();
+                    break;
+                case 'delivery':
+                    content = renderDelivery();
+                    break;
+                case 'success':
+                    content = renderSuccess();
+                    break;
+            }
+            
+            return `
+                ${renderHeader()}
+                ${content}
+                ${state.step === 'catalog' ? renderBottomNav() : ''}
+            `;
+        }
+        
+        function renderHeader() {
+            const level = LEVELS[state.user.levelIndex];
+            return `
+                <div class="bg-white p-4 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center text-2xl" 
+                             style="background: ${level.color}20">
+                            ${level.emoji}
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold">${state.user.name}</p>
+                            <p class="text-xs text-gray-500">${level.name} • ${state.user.points} очков</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">Можно выбрать</p>
+                            <p class="font-bold text-pink-500">${level.products[0]}-${level.products[1]} продуктов</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderCatalog() {
+            const categories = ['Все', 'Лицо', 'Волосы', 'Тело', 'Макияж'];
+            const filtered = state.category === 'Все' 
+                ? PRODUCTS 
+                : PRODUCTS.filter(p => p.category === state.category);
+            
+            const level = LEVELS[state.user.levelIndex];
+            const maxProducts = level.products[1];
+            
+            return `
+                <div class="p-4">
+                    <h2 class="text-xl font-bold mb-1">Выберите продукты</h2>
+                    <p class="text-gray-500 text-sm mb-4">
+                        Выбрано: <span class="font-semibold text-pink-500">${state.selectedProducts.length}</span> / ${maxProducts}
+                    </p>
+                    
+                    <div class="flex gap-2 overflow-x-auto pb-3 mb-4 -mx-4 px-4">
+                        ${categories.map(cat => `
+                            <button 
+                                onclick="setCategory('${cat}')"
+                                class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                                    ${state.category === cat 
+                                        ? 'bg-pink-500 text-white' 
+                                        : 'bg-white text-gray-600 border border-gray-200'}"
+                            >
+                                ${cat}
+                            </button>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        ${filtered.map(product => renderProductCard(product)).join('')}
+                    </div>
+                </div>
+                
+                ${state.selectedProducts.length >= level.products[0] ? `
+                    <div class="bottom-bar">
+                        <button 
+                            onclick="goToCart()"
+                            class="w-full btn-primary py-4 rounded-xl font-semibold flex items-center justify-center gap-2"
+                        >
+                            <span>Оформить бокс</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded-full text-sm">${state.selectedProducts.length}</span>
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        function renderProductCard(product) {
+            const isSelected = state.selectedProducts.includes(product.id);
+            const level = LEVELS[state.user.levelIndex];
+            const canSelect = state.selectedProducts.length < level.products[1] || isSelected;
+            
+            return `
+                <div 
+                    onclick="${canSelect ? `toggleProduct(${product.id})` : ''}"
+                    class="card overflow-hidden transition-all ${isSelected ? 'ring-2 ring-pink-500' : ''} ${!canSelect ? 'opacity-50' : ''}"
+                >
+                    ${product.badge ? `
+                        <div class="absolute top-2 left-2 z-10">
+                            <span class="px-2 py-0.5 text-[10px] font-bold text-white rounded-full ${product.badge === 'HIT' ? 'badge-hit' : 'badge-new'}">
+                                ${product.badge}
+                            </span>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="h-28 flex items-center justify-center text-4xl relative" style="background: ${product.color}30">
+                        ${product.image}
+                        ${isSelected ? `
+                            <div class="absolute inset-0 bg-pink-500/20 flex items-center justify-center">
+                                <div class="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center text-white text-lg">✓</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="p-3">
+                        <h3 class="font-semibold text-sm mb-1 line-clamp-1">${product.name}</h3>
+                        <p class="text-xs text-gray-500 mb-2">${product.volume} • ${product.category}</p>
+                        <div class="flex items-center gap-1">
+                            <span class="text-amber-400 text-sm">★</span>
+                            <span class="text-sm font-medium">${product.rating}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderCart() {
+            const selectedProducts = PRODUCTS.filter(p => state.selectedProducts.includes(p.id));
+            
+            return `
+                <div class="p-4">
+                    <button onclick="goBack()" class="flex items-center gap-2 text-gray-500 mb-4">
+                        ← Назад
+                    </button>
+                    
+                    <h2 class="text-xl font-bold mb-4">Ваш бокс</h2>
+                    
+                    <div class="space-y-3 mb-6">
+                        ${selectedProducts.map(product => `
+                            <div class="card p-3 flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl" style="background: ${product.color}30">
+                                    ${product.image}
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="font-semibold text-sm">${product.name}</h3>
+                                    <p class="text-xs text-gray-500">${product.volume}</p>
+                                </div>
+                                <button onclick="toggleProduct(${product.id})" class="text-gray-400 p-2">✕</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <button 
+                        onclick="goToDelivery()"
+                        class="w-full btn-primary py-4 rounded-xl font-semibold"
+                    >
+                        Далее — Доставка
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderDelivery() {
+            return `
+                <div class="p-4">
+                    <button onclick="state.step = 'cart'; render();" class="flex items-center gap-2 text-gray-500 mb-4">
+                        ← Назад
+                    </button>
+                    
+                    <h2 class="text-xl font-bold mb-4">Данные для доставки</h2>
+                    
+                    <div class="space-y-3 mb-6">
+                        <input 
+                            type="text" 
+                            id="deliveryName"
+                            placeholder="ФИО получателя"
+                            value="${state.delivery.name}"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        >
+                        <input 
+                            type="tel" 
+                            id="deliveryPhone"
+                            placeholder="Телефон"
+                            value="${state.delivery.phone}"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        >
+                        <textarea 
+                            id="deliveryAddress"
+                            placeholder="Адрес доставки с индексом"
+                            rows="3"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
+                        >${state.delivery.address}</textarea>
+                    </div>
+                    
+                    <div class="card p-4 mb-6 bg-amber-50 border border-amber-200">
+                        <p class="text-amber-800 font-medium text-sm">⏰ Срок на контент: 14 дней</p>
+                        <p class="text-amber-600 text-xs mt-1">После получения бокса</p>
+                    </div>
+                    
+                    <button 
+                        onclick="submitOrder()"
+                        class="w-full btn-primary py-4 rounded-xl font-semibold"
+                    >
+                        Оформить коллаборацию
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderSuccess() {
+            return `
+                <div class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center text-5xl mb-6">
+                        ✓
+                    </div>
+                    <h1 class="text-2xl font-bold mb-2">Заявка отправлена!</h1>
+                    <p class="text-gray-500 mb-6">Мы отправим бокс после подтверждения. Следите за уведомлениями.</p>
+                    
+                    <button 
+                        onclick="resetOrder()"
+                        class="btn-primary px-8 py-3 rounded-xl font-semibold"
+                    >
+                        Вернуться в каталог
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderBottomNav() {
+            const tabs = [
+                { id: 'catalog', icon: '🛍️', label: 'Каталог' },
+                { id: 'collabs', icon: '📦', label: 'Коллабы' },
+                { id: 'rating', icon: '🏆', label: 'Рейтинг' },
+                { id: 'profile', icon: '👤', label: 'Профиль' },
+            ];
+            
+            return `
+                <div class="bottom-bar flex justify-around pt-2" style="padding-bottom: max(8px, env(safe-area-inset-bottom))">
+                    ${tabs.map(tab => `
+                        <button 
+                            onclick="setTab('${tab.id}')"
+                            class="flex flex-col items-center gap-1 px-4 py-2 ${state.currentTab === tab.id ? 'text-pink-500' : 'text-gray-400'}"
+                        >
+                            <span class="text-xl">${tab.icon}</span>
+                            <span class="text-xs">${tab.label}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // ==================== ACTIONS ====================
+        
+        function setCategory(cat) {
+            state.category = cat;
+            render();
+        }
+        
+        function toggleProduct(id) {
+            const level = LEVELS[state.user.levelIndex];
+            
+            if (state.selectedProducts.includes(id)) {
+                state.selectedProducts = state.selectedProducts.filter(x => x !== id);
+            } else if (state.selectedProducts.length < level.products[1]) {
+                state.selectedProducts.push(id);
+                tg?.HapticFeedback?.impactOccurred('light');
+            }
+            render();
+        }
+        
+        function goToCart() {
+            state.step = 'cart';
+            render();
+        }
+        
+        function goToDelivery() {
+            state.step = 'delivery';
+            render();
+        }
+        
+        function goBack() {
+            state.step = 'catalog';
+            render();
+        }
+        
+        function submitOrder() {
+            const name = document.getElementById('deliveryName').value;
+            const phone = document.getElementById('deliveryPhone').value;
+            const address = document.getElementById('deliveryAddress').value;
+            
+            if (!name || !phone || !address) {
+                tg?.showAlert('Заполните все поля доставки');
+                return;
+            }
+            
+            state.delivery = { name, phone, address };
+            
+            const order = {
+                action: 'new_order',
+                user: state.user,
+                products: state.selectedProducts.map(id => PRODUCTS.find(p => p.id === id)),
+                delivery: state.delivery,
+            };
+            
+            // Отправляем в бот
+            if (tg) {
+                tg.sendData(JSON.stringify(order));
+            }
+            
+            state.step = 'success';
+            render();
+            tg?.HapticFeedback?.notificationOccurred('success');
+        }
+        
+        function resetOrder() {
+            state.selectedProducts = [];
+            state.step = 'catalog';
+            render();
+        }
+        
+        function setTab(tab) {
+            state.currentTab = tab;
+            if (tab === 'catalog') {
+                state.step = 'catalog';
+            }
+            render();
+            
+            // Показываем заглушки для других табов
+            if (tab !== 'catalog') {
+                tg?.showAlert('Этот раздел скоро появится');
+            }
+        }
+        
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // ==================== INIT ====================
+        
+        render();
+    </script>
+</body>
+</html>
